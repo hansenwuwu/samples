@@ -6,12 +6,12 @@
  *  tree.
  */
 
-'use strict';
+"use strict";
 
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
-  console.log('DOMContentLoaded');
+  console.log("DOMContentLoaded");
   try {
     const enumerateDevices = await navigator.mediaDevices.enumerateDevices();
     gotSources(enumerateDevices);
@@ -19,71 +19,77 @@ async function init() {
     console.log(e);
   }
 
-  const getMediaButton = document.querySelector('button#getMedia');
-  const createPeerConnectionButton = document.querySelector('button#createPeerConnection');
-  const createOfferButton = document.querySelector('button#createOffer');
-  const setOfferButton = document.querySelector('button#setOffer');
-  const createAnswerButton = document.querySelector('button#createAnswer');
-  const setAnswerButton = document.querySelector('button#setAnswer');
-  const hangupButton = document.querySelector('button#hangup');
+  const getMediaButton = document.querySelector("button#getMedia");
+  const createPeerConnectionButton = document.querySelector(
+    "button#createPeerConnection"
+  );
+  const createOfferButton = document.querySelector("button#createOffer");
+  const setOfferButton = document.querySelector("button#setOffer");
+  const showModifyOfferButton = document.querySelector(
+    "button#showModifyOffer"
+  );
+  const createAnswerButton = document.querySelector("button#createAnswer");
+  const setAnswerButton = document.querySelector("button#setAnswer");
+  const hangupButton = document.querySelector("button#hangup");
   let dataChannelDataReceived;
 
   getMediaButton.onclick = getMedia;
   createPeerConnectionButton.onclick = createPeerConnection;
   createOfferButton.onclick = createOffer;
   setOfferButton.onclick = setOffer;
+  showModifyOfferButton.onclick = showModifyOffer;
   createAnswerButton.onclick = createAnswer;
   setAnswerButton.onclick = setAnswer;
   hangupButton.onclick = hangup;
 
-  const offerSdpTextarea = document.querySelector('div#local textarea');
-  const answerSdpTextarea = document.querySelector('div#remote textarea');
+  const offerSdpTextarea = document.querySelector("div#local textarea");
+  const answerSdpTextarea = document.querySelector("div#remote textarea");
 
-  const audioSelect = document.querySelector('select#audioSrc');
-  const videoSelect = document.querySelector('select#videoSrc');
+  const audioSelect = document.querySelector("select#audioSrc");
+  const videoSelect = document.querySelector("select#videoSrc");
 
   audioSelect.onchange = videoSelect.onchange = getMedia;
 
-  const localVideo = document.querySelector('div#local video');
-  const remoteVideo = document.querySelector('div#remote video');
+  const localVideo = document.querySelector("div#local video");
+  const remoteVideo = document.querySelector("div#remote video");
 
-  const selectSourceDiv = document.querySelector('div#selectSource');
+  const selectSourceDiv = document.querySelector("div#selectSource");
 
   let localPeerConnection;
   let remotePeerConnection;
   let localStream;
   let sendChannel;
   let receiveChannel;
-  const dataChannelOptions = {ordered: true};
+  const dataChannelOptions = { ordered: true };
   let dataChannelCounter = 0;
   let sendDataLoop;
   const offerOptions = {
     offerToReceiveAudio: 1,
-    offerToReceiveVideo: 1
+    offerToReceiveVideo: 1,
   };
 
   function gotSources(sourceInfos) {
-    selectSourceDiv.classList.remove('hidden');
+    selectSourceDiv.classList.remove("hidden");
     let audioCount = 0;
     let videoCount = 0;
     for (let i = 0; i < sourceInfos.length; i++) {
-      const option = document.createElement('option');
+      const option = document.createElement("option");
       option.value = sourceInfos[i].deviceId;
       option.text = sourceInfos[i].label;
-      if (sourceInfos[i].kind === 'audioinput') {
+      if (sourceInfos[i].kind === "audioinput") {
         audioCount++;
-        if (option.text === '') {
+        if (option.text === "") {
           option.text = `Audio ${audioCount}`;
         }
         audioSelect.appendChild(option);
-      } else if (sourceInfos[i].kind === 'videoinput') {
+      } else if (sourceInfos[i].kind === "videoinput") {
         videoCount++;
-        if (option.text === '') {
+        if (option.text === "") {
           option.text = `Video ${videoCount}`;
         }
         videoSelect.appendChild(option);
       } else {
-        console.log('unknown', JSON.stringify(sourceInfos[i]));
+        console.log("unknown", JSON.stringify(sourceInfos[i]));
       }
     }
   }
@@ -94,7 +100,7 @@ async function init() {
 
     if (localStream) {
       localVideo.srcObject = null;
-      localStream.getTracks().forEach(track => track.stop());
+      localStream.getTracks().forEach((track) => track.stop());
     }
     const audioSource = audioSelect.value;
     console.log(`Selected audio source: ${audioSource}`);
@@ -103,27 +109,31 @@ async function init() {
 
     const constraints = {
       audio: {
-        optional: [{
-          sourceId: audioSource
-        }]
+        optional: [
+          {
+            sourceId: audioSource,
+          },
+        ],
       },
       video: {
-        optional: [{
-          sourceId: videoSource
-        }]
-      }
+        optional: [
+          {
+            sourceId: videoSource,
+          },
+        ],
+      },
     };
-    console.log('Requested local stream');
+    console.log("Requested local stream");
     try {
       const userMedia = await navigator.mediaDevices.getUserMedia(constraints);
       gotStream(userMedia);
     } catch (e) {
-      console.log('navigator.getUserMedia error: ', e);
+      console.log("navigator.getUserMedia error: ", e);
     }
   }
 
   function gotStream(stream) {
-    console.log('Received local stream');
+    console.log("Received local stream");
     localVideo.srcObject = stream;
     localStream = stream;
   }
@@ -135,7 +145,7 @@ async function init() {
     setOfferButton.disabled = false;
     setAnswerButton.disabled = false;
     hangupButton.disabled = false;
-    console.log('Starting call');
+    console.log("Starting call");
     const videoTracks = localStream.getVideoTracks();
     const audioTracks = localStream.getAudioTracks();
 
@@ -148,27 +158,35 @@ async function init() {
     }
     const servers = null;
 
-    window.localPeerConnection = localPeerConnection = new RTCPeerConnection(servers);
-    console.log('Created local peer connection object localPeerConnection');
-    localPeerConnection.onicecandidate = e => onIceCandidate(localPeerConnection, e);
-    sendChannel = localPeerConnection.createDataChannel('sendDataChannel', dataChannelOptions);
-    sendChannel.onopen = onSendChannelStateChange;
-    sendChannel.onclose = onSendChannelStateChange;
-    sendChannel.onerror = onSendChannelStateChange;
+    window.localPeerConnection = localPeerConnection = new RTCPeerConnection(
+      servers
+    );
+    console.log("Created local peer connection object localPeerConnection");
+    localPeerConnection.onicecandidate = (e) =>
+      onIceCandidate(localPeerConnection, e);
+    localPeerConnection.ontrack = gotRemoteStream;
+    // sendChannel = localPeerConnection.createDataChannel(
+    //   "sendDataChannel",
+    //   dataChannelOptions
+    // );
+    // sendChannel.onopen = onSendChannelStateChange;
+    // sendChannel.onclose = onSendChannelStateChange;
+    // sendChannel.onerror = onSendChannelStateChange;
 
-    window.remotePeerConnection = remotePeerConnection = new RTCPeerConnection(servers);
-    console.log('Created remote peer connection object remotePeerConnection');
-    remotePeerConnection.onicecandidate = e => onIceCandidate(remotePeerConnection, e);
-    remotePeerConnection.ontrack = gotRemoteStream;
-    remotePeerConnection.ondatachannel = receiveChannelCallback;
+    // window.remotePeerConnection = remotePeerConnection = new RTCPeerConnection(servers);
+    // console.log('Created remote peer connection object remotePeerConnection');
+    // remotePeerConnection.onicecandidate = e => onIceCandidate(remotePeerConnection, e);
+    // remotePeerConnection.ontrack = gotRemoteStream;
+    // remotePeerConnection.ondatachannel = receiveChannelCallback;
 
-    localStream.getTracks()
-        .forEach(track => localPeerConnection.addTrack(track, localStream));
-    console.log('Adding Local Stream to peer connection');
+    localStream
+      .getTracks()
+      .forEach((track) => localPeerConnection.addTrack(track, localStream));
+    console.log("Adding Local Stream to peer connection");
   }
 
   function onSetSessionDescriptionSuccess() {
-    console.log('Set session description success.');
+    console.log("Set session description success.");
   }
 
   function onSetSessionDescriptionError(error) {
@@ -193,12 +211,12 @@ async function init() {
     // even though https://tools.ietf.org/html/rfc4566#section-5 requires
     // parsers to handle both LF and CRLF.
     const sdp = offerSdpTextarea.value
-        .split('\n')
-        .map(l => l.trim())
-        .join('\r\n');
+      .split("\n")
+      .map((l) => l.trim())
+      .join("\r\n");
     const offer = {
-      type: 'offer',
-      sdp: sdp
+      type: "offer",
+      sdp: sdp,
     };
     console.log(`Modified Offer from localPeerConnection\n${sdp}`);
 
@@ -210,13 +228,18 @@ async function init() {
       onSetSessionDescriptionError(e);
     }
 
-    try {
-      // eslint-disable-next-line no-unused-vars
-      const ignore = await remotePeerConnection.setRemoteDescription(offer);
-      onSetSessionDescriptionSuccess();
-    } catch (e) {
-      onSetSessionDescriptionError(e);
-    }
+    // try {
+    //   // eslint-disable-next-line no-unused-vars
+    //   const ignore = await remotePeerConnection.setRemoteDescription(offer);
+    //   onSetSessionDescriptionSuccess();
+    // } catch (e) {
+    //   onSetSessionDescriptionError(e);
+    // }
+  }
+
+  async function showModifyOffer() {
+    console.log(localPeerConnection.localDescription);
+    gotDescription1(localPeerConnection.localDescription);
   }
 
   function gotDescription1(description) {
@@ -228,12 +251,13 @@ async function init() {
     // Since the 'remote' side has no media stream we need
     // to pass in the right constraints in order for it to
     // accept the incoming offer of audio and video.
-    try {
-      const answer = await remotePeerConnection.createAnswer();
-      gotDescription2(answer);
-    } catch (e) {
-      onCreateSessionDescriptionError(e);
-    }
+    // try {
+    //   const answer = await remotePeerConnection.createAnswer();
+    //   gotDescription2(answer);
+    // } catch (e) {
+    //   onCreateSessionDescriptionError(e);
+    // }
+    console.log("no need create answer");
   }
 
   async function setAnswer() {
@@ -241,23 +265,23 @@ async function init() {
     // even though https://tools.ietf.org/html/rfc4566#section-5 requires
     // parsers to handle both LF and CRLF.
     const sdp = answerSdpTextarea.value
-        .split('\n')
-        .map(l => l.trim())
-        .join('\r\n');
+      .split("\n")
+      .map((l) => l.trim())
+      .join("\r\n");
     const answer = {
-      type: 'answer',
-      sdp: sdp
+      type: "answer",
+      sdp: sdp,
     };
 
-    try {
-      // eslint-disable-next-line no-unused-vars
-      const ignore = await remotePeerConnection.setLocalDescription(answer);
-      onSetSessionDescriptionSuccess();
-    } catch (e) {
-      onSetSessionDescriptionError(e);
-    }
+    // try {
+    //   // eslint-disable-next-line no-unused-vars
+    //   const ignore = await remotePeerConnection.setLocalDescription(answer);
+    //   onSetSessionDescriptionSuccess();
+    // } catch (e) {
+    //   onSetSessionDescriptionError(e);
+    // }
 
-    console.log(`Modified Answer from remotePeerConnection\n${sdp}`);
+    // console.log(`Modified Answer from remotePeerConnection\n${sdp}`);
     try {
       // eslint-disable-next-line no-unused-vars
       const ignore = await localPeerConnection.setRemoteDescription(answer);
@@ -273,7 +297,7 @@ async function init() {
   }
 
   function sendData() {
-    if (sendChannel.readyState === 'open') {
+    if (sendChannel.readyState === "open") {
       sendChannel.send(dataChannelCounter);
       console.log(`DataChannel send counter: ${dataChannelCounter}`);
       dataChannelCounter++;
@@ -282,8 +306,8 @@ async function init() {
 
   function hangup() {
     remoteVideo.srcObject = null;
-    console.log('Ending call');
-    localStream.getTracks().forEach(track => track.stop());
+    console.log("Ending call");
+    localStream.getTracks().forEach((track) => track.stop());
     sendChannel.close();
     if (receiveChannel) {
       receiveChannel.close();
@@ -306,32 +330,40 @@ async function init() {
   function gotRemoteStream(e) {
     if (remoteVideo.srcObject !== e.streams[0]) {
       remoteVideo.srcObject = e.streams[0];
-      console.log('Received remote stream');
+      console.log("Received remote stream");
     }
   }
 
   function getOtherPc(pc) {
-    return (pc === localPeerConnection) ? remotePeerConnection : localPeerConnection;
+    return pc === localPeerConnection
+      ? remotePeerConnection
+      : localPeerConnection;
   }
 
   function getName(pc) {
-    return (pc === localPeerConnection) ? 'localPeerConnection' : 'remotePeerConnection';
+    return pc === localPeerConnection
+      ? "localPeerConnection"
+      : "remotePeerConnection";
   }
 
   async function onIceCandidate(pc, event) {
     try {
       // eslint-disable-next-line no-unused-vars
-      const ignore = await getOtherPc(pc).addIceCandidate(event.candidate);
+      // const ignore = await getOtherPc(pc).addIceCandidate(event.candidate);
       onAddIceCandidateSuccess(pc);
     } catch (e) {
       onAddIceCandidateError(pc, e);
     }
 
-    console.log(`${getName(pc)} ICE candidate:\n${event.candidate ? event.candidate.candidate : '(null)'}`);
+    console.log(
+      `${getName(pc)} ICE candidate:\n${
+        event.candidate ? event.candidate.candidate : "(null)"
+      }`
+    );
   }
 
   function onAddIceCandidateSuccess() {
-    console.log('AddIceCandidate success.');
+    console.log("AddIceCandidate success.");
   }
 
   function onAddIceCandidateError(error) {
@@ -339,7 +371,7 @@ async function init() {
   }
 
   function receiveChannelCallback(event) {
-    console.log('Receive Channel Callback');
+    console.log("Receive Channel Callback");
     receiveChannel = event.channel;
     receiveChannel.onmessage = onReceiveMessageCallback;
     receiveChannel.onopen = onReceiveChannelStateChange;
@@ -354,7 +386,7 @@ async function init() {
   function onSendChannelStateChange() {
     const readyState = sendChannel.readyState;
     console.log(`Send channel state is: ${readyState}`);
-    if (readyState === 'open') {
+    if (readyState === "open") {
       sendDataLoop = setInterval(sendData, 1000);
     } else {
       clearInterval(sendDataLoop);
