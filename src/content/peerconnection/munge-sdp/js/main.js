@@ -6,7 +6,7 @@
  *  tree.
  */
 
-"use strict";
+// "use strict";
 
 document.addEventListener("DOMContentLoaded", init);
 
@@ -107,14 +107,24 @@ async function init() {
     const videoSource = videoSelect.value;
     console.log(`Selected video source: ${videoSource}`);
 
+    // const constraints = {
+    //   audio: {
+    //     optional: [
+    //       {
+    //         sourceId: audioSource,
+    //       },
+    //     ],
+    //   },
+    //   video: {
+    //     optional: [
+    //       {
+    //         sourceId: videoSource,
+    //       },
+    //     ],
+    //   },
+    // };
     const constraints = {
-      audio: {
-        optional: [
-          {
-            sourceId: audioSource,
-          },
-        ],
-      },
+      audio: false,
       video: {
         optional: [
           {
@@ -239,7 +249,30 @@ async function init() {
 
   async function showModifyOffer() {
     console.log(localPeerConnection.localDescription);
-    gotDescription1(localPeerConnection.localDescription);
+    await gotDescription1(localPeerConnection.localDescription);
+    const sdp = offerSdpTextarea.value
+      .split("\n")
+      .map((l) => l.trim())
+      .join("\r\n");
+    const offer = {
+      sdp: sdp,
+      type: "offer",
+    };
+    offerSdpTextarea.value = JSON.stringify(offer);
+
+    var body = {};
+    body["sdp"] = localPeerConnection.localDescription.sdp;
+    body["type"] = "offer";
+
+    $.ajax({
+      url: "http://192.168.4.42:3000/data/offer",
+      type: "POST",
+      data: JSON.stringify(body),
+      dataType: "text",
+      success: function (data) {
+        console.log("success");
+      },
+    });
   }
 
   function gotDescription1(description) {
@@ -247,6 +280,7 @@ async function init() {
     offerSdpTextarea.value = description.sdp;
   }
 
+  // change to signaling
   async function createAnswer() {
     // Since the 'remote' side has no media stream we need
     // to pass in the right constraints in order for it to
@@ -257,21 +291,51 @@ async function init() {
     // } catch (e) {
     //   onCreateSessionDescriptionError(e);
     // }
-    console.log("no need create answer");
+    // console.log("no need create answer");
+    setInterval(function () {
+      $.ajax({
+        url: "http://192.168.4.42:3000/data/answer",
+        type: "GET",
+        dataType: "text",
+        success: function (data) {
+          var obj = JSON.parse(data);
+          if (obj.type == "answer") {
+            console.log("get answer");
+            const sdp = obj.sdp
+              .split("\n")
+              .map((l) => l.trim())
+              .join("\r\n");
+            const answer = {
+              sdp: sdp,
+              type: "answer",
+            };
+            answerSdpTextarea.value = JSON.stringify(answer);
+            console.log(answer);
+            try {
+              localPeerConnection.setRemoteDescription(answer);
+            } catch (e) {
+              onSetSessionDescriptionError(e);
+            }
+          }
+        },
+      });
+    }, 500);
   }
 
   async function setAnswer() {
     // Restore the SDP from the textarea. Ensure we use CRLF which is what is generated
     // even though https://tools.ietf.org/html/rfc4566#section-5 requires
     // parsers to handle both LF and CRLF.
-    const sdp = answerSdpTextarea.value
-      .split("\n")
-      .map((l) => l.trim())
-      .join("\r\n");
-    const answer = {
-      type: "answer",
-      sdp: sdp,
-    };
+    // const sdp = answerSdpTextarea.value
+    //   .split("\n")
+    //   .map((l) => l.trim())
+    //   .join("\r\n");
+    // const answer = {
+    //   type: "answer",
+    //   sdp: sdp,
+    // };
+
+    const answer = JSON.parse(answerSdpTextarea.value);
 
     // try {
     //   // eslint-disable-next-line no-unused-vars
